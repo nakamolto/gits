@@ -5,6 +5,8 @@ import type { Hex } from 'viem';
 import { toHex } from 'viem';
 import type { LocalAccount } from 'viem/accounts';
 
+import type { ShellDb, SqliteDatabase } from '../storage/db.js';
+
 export type LocalSignerAccount = LocalAccount & { sign: NonNullable<LocalAccount['sign']> };
 
 export interface ShamirShareStore {
@@ -104,16 +106,6 @@ export class ChainIdMismatchError extends SafeHavenError {
   }
 }
 
-export interface SqliteStatementLike {
-  run(params?: unknown[] | Record<string, unknown>): unknown;
-  all(params?: unknown[] | Record<string, unknown>): unknown[];
-}
-
-export interface SqliteDatabaseLike {
-  exec(sql: string): unknown;
-  prepare(sql: string): SqliteStatementLike;
-}
-
 function hexToBytesStrict(hex: Hex): Uint8Array {
   if (!hex.startsWith('0x')) throw new Error(`Invalid hex: ${hex}`);
   const body = hex.slice(2);
@@ -125,41 +117,36 @@ function bytesToHexStrict(bytes: Uint8Array): Hex {
   return toHex(bytes) as Hex;
 }
 
+type PreparedStatement = ReturnType<SqliteDatabase['prepare']>;
+
 export class SqliteShamirShareStore implements ShamirShareStore {
-  private readonly insertStmt: SqliteStatementLike;
-  private readonly selectStmt: SqliteStatementLike;
-  private readonly purgeStmt: SqliteStatementLike;
+  private readonly insertStmt: PreparedStatement;
+  private readonly selectStmt: PreparedStatement;
+  private readonly purgeStmt: PreparedStatement;
 
-  constructor(private readonly db: SqliteDatabaseLike) {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS shamir_shares (
-        ghost_id BLOB NOT NULL,
-        share_index INTEGER NOT NULL,
-        encrypted_share BLOB NOT NULL,
-        received_epoch INTEGER NOT NULL,
-        PRIMARY KEY (ghost_id, share_index)
-      );
-    `);
-
-    this.insertStmt = db.prepare(
+  constructor(db: ShellDb) {
+    const raw = db.raw();
+    // Table created by ShellDb migration.
+    this.insertStmt = raw.prepare(
       `INSERT OR REPLACE INTO shamir_shares (ghost_id, share_index, encrypted_share, received_epoch) VALUES (?, ?, ?, ?)`,
     );
-    this.selectStmt = db.prepare(
+    this.selectStmt = raw.prepare(
       `SELECT share_index, encrypted_share, received_epoch FROM shamir_shares WHERE ghost_id = ? ORDER BY share_index ASC`,
     );
-    this.purgeStmt = db.prepare(`DELETE FROM shamir_shares WHERE ghost_id = ?`);
+    this.purgeStmt = raw.prepare(`DELETE FROM shamir_shares WHERE ghost_id = ?`);
   }
 
   receiveShare(ghost_id: Hex, share_index: number, encrypted_share: Uint8Array, received_epoch: number): void {
     const ghostBytes = Buffer.from(hexToBytesStrict(ghost_id));
     const shareBytes = Buffer.from(encrypted_share);
 
-    this.insertStmt.run([ghostBytes, share_index, shareBytes, received_epoch]);
+    // better-sqlite3 expects variadic params (not a single array param).
+    this.insertStmt.run(ghostBytes, share_index, shareBytes, received_epoch);
   }
 
   getShares(ghost_id: Hex): Array<{ share_index: number; encrypted_share: Uint8Array; received_epoch: number }> {
     const ghostBytes = Buffer.from(hexToBytesStrict(ghost_id));
-    const rows = this.selectStmt.all([ghostBytes]) as Array<{
+    const rows = this.selectStmt.all(ghostBytes) as Array<{
       share_index: number;
       encrypted_share: Uint8Array | Buffer | number[];
       received_epoch: number;
@@ -174,7 +161,7 @@ export class SqliteShamirShareStore implements ShamirShareStore {
 
   purgeShares(ghost_id: Hex): void {
     const ghostBytes = Buffer.from(hexToBytesStrict(ghost_id));
-    this.purgeStmt.run([ghostBytes]);
+    this.purgeStmt.run(ghostBytes);
   }
 }
 

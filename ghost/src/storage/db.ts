@@ -172,6 +172,13 @@ export class GhostDB {
         executed INT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS spend_tracking (
+        ghost_id BLOB NOT NULL,
+        epoch INTEGER NOT NULL,
+        spent_amount TEXT NOT NULL,
+        PRIMARY KEY (ghost_id, epoch)
+      );
+
       CREATE TABLE IF NOT EXISTS chain_cursor (
         id INT PRIMARY KEY DEFAULT 1,
         last_block INT NOT NULL
@@ -200,6 +207,24 @@ export class GhostDB {
       key,
       value,
     );
+  }
+
+  // ─── spend_tracking ─────────────────────────────────────────────────────
+
+  getSpentThisEpoch(ghostId: Uint8Array, epoch: number): bigint {
+    const row = this.db
+      .prepare('SELECT spent_amount FROM spend_tracking WHERE ghost_id = ? AND epoch = ?')
+      .get(Buffer.from(ghostId), epoch) as { spent_amount: string } | undefined;
+    return row ? BigInt(row.spent_amount) : 0n;
+  }
+
+  setSpentThisEpoch(ghostId: Uint8Array, epoch: number, amount: bigint): void {
+    this.db
+      .prepare(
+        `INSERT INTO spend_tracking(ghost_id, epoch, spent_amount) VALUES(?, ?, ?)
+         ON CONFLICT(ghost_id, epoch) DO UPDATE SET spent_amount = excluded.spent_amount`,
+      )
+      .run(Buffer.from(ghostId), epoch, amount.toString());
   }
 
   // ─── sessions ───────────────────────────────────────────────────────────
