@@ -116,6 +116,14 @@ contract GhostRegistryMock is IGhostRegistry {
         revert("not implemented");
     }
 
+    function recordRewardCredit(bytes32, uint256) external pure {
+        revert("not implemented");
+    }
+
+    function cumulativeRewards(bytes32) external pure returns (uint256) {
+        revert("not implemented");
+    }
+
     function getGhost(bytes32 ghost_id) external view returns (GhostRecord memory) {
         return _ghosts[ghost_id];
     }
