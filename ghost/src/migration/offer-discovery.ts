@@ -1,4 +1,4 @@
-import { publicKeyToAddress, verifyTypedData } from 'viem';
+import { bytesToHex, getAddress, hexToBytes, keccak256, verifyTypedData } from 'viem';
 import type { Address, Hex, TypedData } from 'viem';
 
 import { scoreOffer } from './planner.js';
@@ -53,10 +53,15 @@ function offerSignerAddressFromShellRecord(shell: ShellRecord): Address {
   const pk = shell.offer_signer_pubkey;
 
   // Test-friendly: allow storing the signer address directly.
-  if (typeof pk === 'string' && pk.length === 42) return pk as Address;
+  if (typeof pk === 'string' && pk.length === 42) return getAddress(pk as Address);
 
   // Otherwise treat it as an uncompressed public key (0x04 + 64 bytes).
-  return publicKeyToAddress(pk);
+  const bytes = hexToBytes(pk);
+  const pubkey = bytes.length === 65 && bytes[0] === 4 ? bytes.subarray(1) : bytes;
+  if (pubkey.length !== 64) throw new Error('offer signer pubkey must be 64 or 65 bytes');
+
+  const digest = keccak256(bytesToHex(pubkey));
+  return getAddress(('0x' + digest.slice(-40)) as Address);
 }
 
 export interface OfferDiscoveryDeps {
@@ -198,4 +203,3 @@ export async function rankOffers(
   ranked.sort((a, b) => b.score - a.score);
   return ranked;
 }
-

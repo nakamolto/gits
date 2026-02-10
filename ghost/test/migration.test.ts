@@ -321,8 +321,12 @@ describe('state-packager', () => {
       key,
       compression: 'gzip',
       hooks: {
-        flush: async () => calls.push('flush'),
-        reload: async () => calls.push('reload'),
+        flush: async () => {
+          calls.push('flush');
+        },
+        reload: async () => {
+          calls.push('reload');
+        },
       },
     });
 
@@ -331,8 +335,12 @@ describe('state-packager', () => {
     await restoreState(bundle, dst, {
       key,
       hooks: {
-        flush: async () => calls.push('flush2'),
-        reload: async () => calls.push('reload'),
+        flush: async () => {
+          calls.push('flush2');
+        },
+        reload: async () => {
+          calls.push('reload');
+        },
       },
     });
 
