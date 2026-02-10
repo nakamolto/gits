@@ -1,7 +1,7 @@
 {
   "name": "@gits-protocol/ghost",
   "version": "0.0.0",
-  "description": "Ghost daemon core infrastructure for the GITS protocol",
+  "description": "Ghost daemon for the GITS protocol",
   "type": "module",
   "main": "./dist/exports.js",
   "types": "./dist/exports.d.ts",
@@ -29,7 +29,9 @@
   },
   "dependencies": {
     "@gits-protocol/sdk": "file:../sdk",
-    "@noble/hashes": "^1.8.0",
+    "@noble/ciphers": "^2.1.1",
+    "@noble/curves": "^2.0.1",
+    "@noble/hashes": "^2.0.1",
     "@noble/secp256k1": "^3.0.0",
     "better-sqlite3": "^12.0.0",
     "commander": "^14.0.0",

@@ -13,3 +13,6 @@ export * from './telemetry/metrics.js';
 export * from './telemetry/health.js';
 
 export * as migration from './migration/index.js';
+
+export * as vaulting from './vaulting/vault-manager.js';
+export * as recovery from './recovery/recovery-monitor.js';
