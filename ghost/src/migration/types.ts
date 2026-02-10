@@ -1,4 +1,7 @@
+import type { Offer } from '@gits-protocol/sdk';
 import type { Address, Hex } from 'viem';
+
+export type { Offer };
 
 export type MigrationUrgency = 'emergency' | 'urgent' | 'routine';
 
@@ -51,24 +54,6 @@ export interface MigrationPlan {
   estimatedBundleBytes: bigint;
 }
 
-// Part 3 spec, Section 13.1 (Offer discovery).
-export interface Offer {
-  offer_id: Hex;
-  shell_id: Hex;
-  chain_id: bigint;
-  nonce: bigint;
-  price_per_SU: bigint;
-  escrow_asset: Address;
-  min_lease: bigint;
-  max_SU: bigint;
-  assurance_tier: number;
-  capability_hash: Hex;
-  policy_tags: Hex;
-  region: Hex;
-  capacity: number;
-  expiry: bigint;
-}
-
 export interface DiscoveredOffer {
   offer: Offer;
   signature: Hex;
@@ -89,6 +74,7 @@ export interface RankedDestination {
   score: number;
 }
 
+// Subset of SDK ShellRecord -- migration only needs these fields.
 export interface ShellRecord {
   shell_id: Hex;
   offer_signer_pubkey: Hex; // canonical pubkey bytes; may be an address-hex in tests
@@ -97,6 +83,7 @@ export interface ShellRecord {
   assurance_tier?: number;
 }
 
+// Subset of SDK SessionState -- migration only needs these fields.
 export interface SessionState {
   shell_id: Hex;
   staging: boolean;

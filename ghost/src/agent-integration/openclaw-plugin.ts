@@ -1,3 +1,5 @@
+import type { PolicyDelta } from '@gits-protocol/sdk';
+
 // Minimal local types so this module is testable without importing OpenClaw.
 export interface AgentContext {
   // Placeholder for runtime-provided context (model, tools, storage, etc).
@@ -12,7 +14,7 @@ export interface AgentSkill {
 }
 
 export type MigrationReason = string;
-export type PolicyDelta = unknown;
+export type { PolicyDelta };
 
 export interface GhostDaemonCallbacks {
   init(agent: AgentContext): Promise<void>;

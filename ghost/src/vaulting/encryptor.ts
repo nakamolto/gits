@@ -43,3 +43,23 @@ export function decrypt(vault: EncryptedVault, vaultKey: Uint8Array): Uint8Array
   return aes.decrypt(sealed);
 }
 
+export function encodeVaultBlob(vault: EncryptedVault): Uint8Array {
+  if (vault.nonce.length !== 12) throw new Error(`InvalidNonceLength:${vault.nonce.length}`);
+  if (vault.tag.length !== 16) throw new Error(`InvalidTagLength:${vault.tag.length}`);
+  const out = new Uint8Array(1 + 12 + 16 + vault.ciphertext.length);
+  out[0] = 1; // v1
+  out.set(vault.nonce, 1);
+  out.set(vault.tag, 1 + 12);
+  out.set(vault.ciphertext, 1 + 12 + 16);
+  return out;
+}
+
+export function decodeVaultBlob(blob: Uint8Array): EncryptedVault {
+  if (blob.length < 29) throw new Error('VaultBlobTooShort');
+  if (blob[0] !== 1) throw new Error(`UnsupportedVaultVersion:${blob[0]}`);
+  return {
+    nonce: blob.slice(1, 13),
+    tag: blob.slice(13, 29),
+    ciphertext: blob.slice(29),
+  };
+}
