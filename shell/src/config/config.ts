@@ -66,6 +66,10 @@ export interface ShellConfig {
     heartbeatTransport: HeartbeatTransport;
     heartbeatSocketPath: string;
   };
+  recovery?: {
+    enabled: boolean;
+    recoveryKeyPath: string;
+  };
 }
 
 export function defaultShellConfigPath(): string {
@@ -179,13 +183,26 @@ export async function loadShellConfig(configPath: string = defaultShellConfigPat
   const network = expectRecord(root['network'], 'network');
   const teeRaw = root['tee'];
   const tee = teeRaw === undefined ? undefined : expectRecord(teeRaw, 'tee');
+  const recoveryRaw = root['recovery'];
+  const recovery = recoveryRaw === undefined ? undefined : expectRecord(recoveryRaw, 'recovery');
 
   const shellId = optHex32(identity['shellId'] ?? identity['shell_id']);
+
+  const identityRecoveryKeyPath = expandHome(
+    expectString(identity['recoveryKeyPath'] ?? identity['recovery_key_path'], 'identity.recoveryKeyPath'),
+  );
 
   const dataDir = expandHome(expectString(storage['dataDir'] ?? storage['data_dir'], 'storage.dataDir'));
 
   const heartbeatSocketPath =
     expandHome(optString(network['heartbeatSocketPath'] ?? network['heartbeat_socket_path']) ?? '~/.gits/heartbeat.sock');
+
+  const recoveryCfg: ShellConfig['recovery'] | undefined = recovery
+    ? {
+        enabled: expectBoolean(recovery['enabled'] ?? false, 'recovery.enabled'),
+        recoveryKeyPath: expandHome(optString(recovery['recoveryKeyPath'] ?? recovery['recovery_key_path']) ?? identityRecoveryKeyPath),
+      }
+    : undefined;
 
   const cfg: ShellConfig = {
     identity: {
@@ -194,7 +211,7 @@ export async function loadShellConfig(configPath: string = defaultShellConfigPat
       offerSignerKeyPath: expandHome(
         expectString(identity['offerSignerKeyPath'] ?? identity['offer_signer_key_path'], 'identity.offerSignerKeyPath'),
       ),
-      recoveryKeyPath: expandHome(expectString(identity['recoveryKeyPath'] ?? identity['recovery_key_path'], 'identity.recoveryKeyPath')),
+      recoveryKeyPath: identityRecoveryKeyPath,
       payoutAddress: expectAddress(identity['payoutAddress'] ?? identity['payout_address'], 'identity.payoutAddress'),
     },
     chain: {
@@ -241,6 +258,7 @@ export async function loadShellConfig(configPath: string = defaultShellConfigPat
       ),
       heartbeatSocketPath,
     },
+    recovery: recoveryCfg,
   };
 
   if (cfg.compute.maxConcurrentSessions <= 0) throw new Error('compute.maxConcurrentSessions must be > 0');
@@ -251,4 +269,3 @@ export async function loadShellConfig(configPath: string = defaultShellConfigPat
 
   return cfg;
 }
-

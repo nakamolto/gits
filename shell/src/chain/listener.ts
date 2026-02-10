@@ -6,7 +6,7 @@ import type { ShellDb } from '../storage/db.js';
 import { ABIS } from './submitter.js';
 
 const OPEN_SESSION_ABI = parseAbi([
-  'function openSession(bytes32 ghost_id, bytes32 shell_id, tuple(uint256 price_per_SU, uint32 max_SU, uint256 lease_expiry_epoch, uint256 tenure_limit_epochs, bytes ghost_session_key, bytes shell_session_key, address submitter_address, address asset) params) external',
+  'function openSession(bytes32 ghost_id, bytes32 shell_id, (uint256 price_per_SU, uint32 max_SU, uint256 lease_expiry_epoch, uint256 tenure_limit_epochs, bytes ghost_session_key, bytes shell_session_key, address submitter_address, address asset) params) external',
 ]);
 
 const EVT_SESSION_OPENED = parseAbiItem('event SessionOpened(bytes32 indexed ghost_id, bytes32 indexed shell_id, uint256 session_id)');
@@ -71,6 +71,7 @@ export class ChainListener {
 
   private running = false;
   private pollIntervalMs = 5_000;
+  private loopPromise: Promise<void> | null = null;
 
   constructor(args: { cfg: ShellConfig; db: ShellDb; publicClient: any; handlers: ChainListenerHandlers; logger?: any }) {
     this.cfg = args.cfg;
@@ -83,11 +84,15 @@ export class ChainListener {
   async start(): Promise<void> {
     if (this.running) return;
     this.running = true;
-    void this.loop();
+    this.loopPromise = this.loop();
   }
 
   async stop(): Promise<void> {
     this.running = false;
+    if (this.loopPromise) {
+      await this.loopPromise;
+      this.loopPromise = null;
+    }
   }
 
   private async loop(): Promise<void> {
@@ -252,4 +257,3 @@ export class ChainListener {
     }
   }
 }
-

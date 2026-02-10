@@ -119,13 +119,13 @@ export class ShellSessionManager {
       return;
     }
 
-    this.active.set(args.sessionId, { ghostId: args.ghostId, shellId: args.shellId, status: 'active' });
-
-    this.heartbeat.registerSession({ sessionId: args.sessionId, ghostSessionKey: args.ghostSessionKey, shellSessionKey: args.shellSessionKey });
-
     const issued = this.issuedKeys.consumeForEncodedSessionKey(args.shellSessionKey);
+    const status: SessionRecordStatus = issued ? 'active' : 'unserviceable';
+    this.active.set(args.sessionId, { ghostId: args.ghostId, shellId: args.shellId, status });
+
     const pub = pubkeyHexFromEncodedSessionKey(args.shellSessionKey);
     if (issued) {
+      this.heartbeat.registerSession({ sessionId: args.sessionId, ghostSessionKey: args.ghostSessionKey, shellSessionKey: args.shellSessionKey });
       this.heartbeat.setShellSessionPrivateKey(args.sessionId, issued.privateKey);
     }
 
@@ -142,23 +142,20 @@ export class ShellSessionManager {
         args.sessionId,
         Buffer.from(hexToBytes(args.ghostId)),
         Buffer.from(hexToBytes(args.shellId)),
-        issued ? 'active' : 'active',
+        status,
         args.startEpoch ?? 0n,
         null,
         pubBlob,
         args.paramsJson ?? null,
       );
-
-    if (!issued) {
-      // We can still service if operator manually loaded the private key elsewhere,
-      // but in v1 we treat as unserviceable for safety.
-      this.db.raw().prepare(`UPDATE sessions SET status = ? WHERE session_id = ?`).run('unserviceable', args.sessionId);
-    }
   }
 
   onSessionClosed(args: { sessionId: bigint; ghostId: Hex; shellId: Hex; endEpoch?: bigint }): void {
+    const existing = this.active.get(args.sessionId);
+    if (existing?.status === 'active') {
+      this.heartbeat.unregisterSession(args.sessionId);
+    }
     this.active.delete(args.sessionId);
-    this.heartbeat.unregisterSession(args.sessionId);
 
     this.db
       .raw()
