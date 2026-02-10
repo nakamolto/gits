@@ -18,14 +18,21 @@ Three documents:
 ## Repository structure
 
 ```
-src/
-  interfaces/     # Normative Solidity interfaces (Section 14 of the spec)
-  types/          # Shared structs, enums, and constants
+contracts/            # Solidity smart contracts (Foundry)
+  src/
+    interfaces/       # Normative interfaces (Section 14 of the spec)
+    types/            # Shared structs, enums, and constants
+  test/               # Foundry tests
+  script/             # Deployment scripts
+sdk/                  # TypeScript SDK (planned)
+ghost/                # Ghost daemon (planned)
+shell/                # Shell daemon (planned)
 ```
 
 ## Build
 
 ```bash
+cd contracts
 forge build
 forge test
 ```
