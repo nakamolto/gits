@@ -11,6 +11,7 @@ import { recoverAuthDigest, shareAckDigest, shareDigest } from '@gits-protocol/s
 
 import {
   ActiveRecoveryInitiatorError,
+  ChainIdMismatchError,
   NoShareError,
   SafeHaven,
   SqliteShamirShareStore,
@@ -344,6 +345,56 @@ describe('Safe Haven', () => {
     );
   });
 
+  it('member flow errors on chain_id mismatch (prevents cross-chain signing)', async () => {
+    const SQL = await initSqlJs();
+    const db = new SQL.Database();
+    const store = new SqliteShamirShareStore(new SqljsDatabaseAdapter(db));
+
+    const identity = privateKeyToAccount('0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef');
+    const recovery = privateKeyToAccount('0x1111111111111111111111111111111111111111111111111111111111111111');
+
+    const ghost_id = bytes32('22');
+    const attempt_id = 1n;
+    const checkpoint_commitment = bytes32('33');
+    const envelope_commitment = bytes32('44');
+    const pk_new = '0xaabbccdd' as `0x${string}`;
+
+    store.receiveShare(ghost_id, 1, new Uint8Array([1]), 0);
+
+    const sh = new SafeHaven({
+      chain_id: 1n,
+      shell_id: bytes32('aa'),
+      identity_account: identity,
+      recovery_account: recovery,
+      store,
+      attempts: { getRecoveryAttempt: async () => ({ checkpoint_commitment, envelope_commitment }) },
+      decryptShare: async (b) => b,
+    });
+
+    const rbc: RBC = {
+      ghost_id,
+      attempt_id,
+      checkpoint_commitment,
+      pk_new,
+      pk_transport: '0x1234',
+      measurement_hash: bytes32('55'),
+      tcb_min: bytes32('66'),
+      valid_to: 0n,
+      sigs_verifiers: [],
+    };
+
+    await expect(
+      sh.authorizeRecovery({
+        chain_id: 2n,
+        ghost_id,
+        attempt_id,
+        checkpoint_commitment,
+        pk_new,
+        rbc,
+      }),
+    ).rejects.toBeInstanceOf(ChainIdMismatchError);
+  });
+
   it('initiator flow errors when threshold not met', async () => {
     const SQL = await initSqlJs();
     const db = new SQL.Database();
@@ -406,4 +457,3 @@ describe('Safe Haven', () => {
     ).rejects.toBeInstanceOf(ThresholdNotMetError);
   });
 });
-

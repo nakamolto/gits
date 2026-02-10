@@ -98,6 +98,12 @@ export class ThresholdNotMetError extends SafeHavenError {
   }
 }
 
+export class ChainIdMismatchError extends SafeHavenError {
+  constructor(expected: bigint, actual: bigint) {
+    super(`chain_id mismatch (expected=${expected}, actual=${actual})`);
+  }
+}
+
 export interface SqliteStatementLike {
   run(params?: unknown[] | Record<string, unknown>): unknown;
   all(params?: unknown[] | Record<string, unknown>): unknown[];
@@ -198,6 +204,7 @@ export class SafeHaven {
   }
 
   async authorizeRecovery(req: AuthorizeRequest): Promise<AuthorizeResponse> {
+    if (req.chain_id !== this.opts.chain_id) throw new ChainIdMismatchError(this.opts.chain_id, req.chain_id);
     if (req.rbc.ghost_id !== req.ghost_id) throw new RBCMismatchError('ghost_id');
     if (req.rbc.attempt_id !== req.attempt_id) throw new RBCMismatchError('attempt_id');
     if (req.rbc.checkpoint_commitment !== req.checkpoint_commitment) throw new RBCMismatchError('checkpoint_commitment');
@@ -220,7 +227,7 @@ export class SafeHaven {
     }
 
     const authHash = recoverAuthDigest({
-      chain_id: req.chain_id,
+      chain_id: this.opts.chain_id,
       ghost_id: req.ghost_id,
       attempt_id: req.attempt_id,
       checkpoint_commitment: req.checkpoint_commitment,
@@ -229,7 +236,7 @@ export class SafeHaven {
     const sigAuth = await this.opts.identity_account.sign({ hash: authHash });
 
     const shareHash = shareDigest({
-      chain_id: req.chain_id,
+      chain_id: this.opts.chain_id,
       ghost_id: req.ghost_id,
       attempt_id: req.attempt_id,
       checkpoint_commitment: req.checkpoint_commitment,
@@ -238,7 +245,7 @@ export class SafeHaven {
     const sigShell = await this.opts.identity_account.sign({ hash: shareHash });
 
     const ackHash = shareAckDigest({
-      chain_id: req.chain_id,
+      chain_id: this.opts.chain_id,
       ghost_id: req.ghost_id,
       attempt_id: req.attempt_id,
       checkpoint_commitment: req.checkpoint_commitment,
@@ -319,4 +326,3 @@ export class SafeHaven {
 export function createAuthorizeHandler(sh: SafeHaven): (body: AuthorizeRequest) => Promise<AuthorizeResponse> {
   return async (body) => sh.authorizeRecovery(body);
 }
-
