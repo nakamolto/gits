@@ -7,20 +7,21 @@ import { recoverAuthDigest, shareAckDigest, shareDigest } from './digests.js';
 
 const TAG_RBC = keccak256(toBytes('GITS_RBC'));
 
-export function rbcDigest(args: { chain_id: bigint; session_manager_address: Address; rbc: RBC }): Hex {
-  const { chain_id, session_manager_address, rbc } = args;
+export function rbcDigest(args: { chain_id: bigint; rbc: RBC }): Hex {
+  const { chain_id, rbc } = args;
+  const pk_new_hash = keccak256(rbc.pk_new);
+  const pk_transport_hash = keccak256(rbc.pk_transport);
 
   return keccak256(
     encodeAbiParameters(
       [
         { type: 'bytes32' },
         { type: 'uint256' },
-        { type: 'address' },
         { type: 'bytes32' },
         { type: 'uint256' },
         { type: 'bytes32' },
-        { type: 'bytes' },
-        { type: 'bytes' },
+        { type: 'bytes32' },
+        { type: 'bytes32' },
         { type: 'bytes32' },
         { type: 'bytes32' },
         { type: 'uint256' },
@@ -28,12 +29,11 @@ export function rbcDigest(args: { chain_id: bigint; session_manager_address: Add
       [
         TAG_RBC,
         chain_id,
-        session_manager_address,
         rbc.ghost_id,
         rbc.attempt_id,
         rbc.checkpoint_commitment,
-        rbc.pk_new,
-        rbc.pk_transport,
+        pk_new_hash,
+        pk_transport_hash,
         rbc.measurement_hash,
         rbc.tcb_min,
         rbc.valid_to,

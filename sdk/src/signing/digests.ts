@@ -145,25 +145,24 @@ export function revokeMeasurementDigest(args: {
 
 export function recoverAuthDigest(args: {
   chain_id: bigint;
-  session_manager_address: Address;
   ghost_id: Hex;
   attempt_id: bigint;
   checkpoint_commitment: Hex;
   pk_new: Hex;
 }): Hex {
-  const { chain_id, session_manager_address, ghost_id, attempt_id, checkpoint_commitment, pk_new } = args;
+  const { chain_id, ghost_id, attempt_id, checkpoint_commitment, pk_new } = args;
+  const pk_new_hash = keccak256(pk_new);
   return keccak256(
     encodeAbiParameters(
       [
         { type: 'bytes32' },
         { type: 'uint256' },
-        { type: 'address' },
         { type: 'bytes32' },
         { type: 'uint256' },
         { type: 'bytes32' },
-        { type: 'bytes' },
+        { type: 'bytes32' },
       ],
-      [TAG_RECOVER_AUTH, chain_id, session_manager_address, ghost_id, attempt_id, checkpoint_commitment, pk_new],
+      [TAG_RECOVER_AUTH, chain_id, ghost_id, attempt_id, checkpoint_commitment, pk_new_hash],
     ),
   );
 }
@@ -173,8 +172,9 @@ export function shareDigest(args: {
   ghost_id: Hex;
   attempt_id: bigint;
   checkpoint_commitment: Hex;
+  envelope_commitment: Hex;
 }): Hex {
-  const { chain_id, ghost_id, attempt_id, checkpoint_commitment } = args;
+  const { chain_id, ghost_id, attempt_id, checkpoint_commitment, envelope_commitment } = args;
   return keccak256(
     encodeAbiParameters(
       [
@@ -183,8 +183,9 @@ export function shareDigest(args: {
         { type: 'bytes32' },
         { type: 'uint256' },
         { type: 'bytes32' },
+        { type: 'bytes32' },
       ],
-      [TAG_SHARE, chain_id, ghost_id, attempt_id, checkpoint_commitment],
+      [TAG_SHARE, chain_id, ghost_id, attempt_id, checkpoint_commitment, envelope_commitment],
     ),
   );
 }
@@ -194,9 +195,9 @@ export function shareAckDigest(args: {
   ghost_id: Hex;
   attempt_id: bigint;
   checkpoint_commitment: Hex;
-  shell_id: Hex;
+  envelope_commitment: Hex;
 }): Hex {
-  const { chain_id, ghost_id, attempt_id, checkpoint_commitment, shell_id } = args;
+  const { chain_id, ghost_id, attempt_id, checkpoint_commitment, envelope_commitment } = args;
   return keccak256(
     encodeAbiParameters(
       [
@@ -207,7 +208,7 @@ export function shareAckDigest(args: {
         { type: 'bytes32' },
         { type: 'bytes32' },
       ],
-      [TAG_SHARE_ACK, chain_id, ghost_id, attempt_id, checkpoint_commitment, shell_id],
+      [TAG_SHARE_ACK, chain_id, ghost_id, attempt_id, checkpoint_commitment, envelope_commitment],
     ),
   );
 }

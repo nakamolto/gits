@@ -23,11 +23,12 @@ export const part3_14_9 = {
     ghost_id: '0x7f36bb45ea0ff17cdefa9d9cae3247c526985b0c14c8903be7b354961ad89123' as Hex,
     attempt_id: 3n,
     checkpoint_commitment: '0x5b31a77e397fbe08a819b514a2f468be97009d2c4210a159b74d4b9a6fd6f4d9' as Hex,
-    expected: '0x1495176acbec25d185a38362f71cbc05d21ab88abf55ffeebfff202cc48cce67' as Hex,
+    envelope_commitment: '0xde00a0f376943b7461641517e69ae49a6c5161c3e05fc28f5c14f154b551c79c' as Hex,
+    expected: '0x377e3c007216a5ed98ceec809e3cbc9967de57cf24b24739eb1324bb83dcfb7b' as Hex,
   },
 
   vector_c: {
-    shell_id_j: '0xde00a0f376943b7461641517e69ae49a6c5161c3e05fc28f5c14f154b551c79c' as Hex,
+    envelope_commitment: '0xde00a0f376943b7461641517e69ae49a6c5161c3e05fc28f5c14f154b551c79c' as Hex,
     expected: '0x734b462d3e98bd28040d76cdc724ee8217204fb476b8cd1522a641436b057b35' as Hex,
   },
 

@@ -35,6 +35,7 @@ describe('Signing digests (Part 3 vectors)', () => {
       ghost_id: part3_14_9.vector_b.ghost_id,
       attempt_id: part3_14_9.vector_b.attempt_id,
       checkpoint_commitment: part3_14_9.vector_b.checkpoint_commitment,
+      envelope_commitment: part3_14_9.vector_b.envelope_commitment,
     });
     expect(d).toBe(part3_14_9.vector_b.expected);
   });
@@ -45,7 +46,7 @@ describe('Signing digests (Part 3 vectors)', () => {
       ghost_id: part3_14_9.vector_b.ghost_id,
       attempt_id: part3_14_9.vector_b.attempt_id,
       checkpoint_commitment: part3_14_9.vector_b.checkpoint_commitment,
-      shell_id: part3_14_9.vector_c.shell_id_j,
+      envelope_commitment: part3_14_9.vector_c.envelope_commitment,
     });
     expect(d).toBe(part3_14_9.vector_c.expected);
   });
