@@ -86,8 +86,9 @@ contract GhostRegistryTest is Test {
     }
 
     function _rotationDigest(bytes32 ghost_id, bytes memory newIdentityPubkey) internal view returns (bytes32) {
-        bytes32 tag = keccak256(bytes("GITS_GHOST_ROTATE"));
-        return keccak256(abi.encode(tag, ghost_id, newIdentityPubkey, block.chainid));
+        bytes32 tag = keccak256(bytes("GITS_ROTATE"));
+        uint256 nonce = registry.rotationNonce(ghost_id);
+        return keccak256(abi.encode(tag, ghost_id, newIdentityPubkey, block.chainid, nonce));
     }
 
     function _sig(uint256 sk, bytes32 digest) internal view returns (bytes memory) {

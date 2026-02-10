@@ -17,7 +17,7 @@ contract GhostRegistry is IGhostRegistry {
     // ─── Constants / Tags ────────────────────────────────────────────────────
 
     bytes32 internal constant GHOST_ID_TAG_HASH = keccak256(bytes("GITS_GHOST_ID"));
-    bytes32 internal constant ROTATE_TAG_HASH = keccak256(bytes("GITS_GHOST_ROTATE"));
+    bytes32 internal constant ROTATE_TAG_HASH = keccak256(bytes("GITS_ROTATE"));
 
     // ─── Deployment Params ───────────────────────────────────────────────────
 
@@ -42,6 +42,9 @@ contract GhostRegistry is IGhostRegistry {
 
     // Reward history credit used for passport eligibility (see ghostPassportEligible).
     mapping(bytes32 => uint256) public cumulativeRewards;
+
+    // Per-ghost rotation nonce to prevent signature replay on rotateSigner.
+    mapping(bytes32 => uint256) public rotationNonce;
 
     // ─── Errors ─────────────────────────────────────────────────────────────
 
@@ -239,11 +242,14 @@ contract GhostRegistry is IGhostRegistry {
 
         if (msg.sender == g.wallet) {
             // Normal path: proof must be a signature by the CURRENT identity key over the rotation digest.
-            bytes32 digest = keccak256(abi.encode(ROTATE_TAG_HASH, ghost_id, new_identity_pubkey, block.chainid));
+            uint256 nonce = rotationNonce[ghost_id];
+            bytes32 digest = keccak256(abi.encode(ROTATE_TAG_HASH, ghost_id, new_identity_pubkey, block.chainid, nonce));
             address expectedSigner = _k1AddressFromIdentityKey(g.identity_pubkey);
 
             (address recovered, ECDSA.RecoverError err,) = ECDSA.tryRecover(digest, proof);
             if (err != ECDSA.RecoverError.NoError || recovered != expectedSigner) revert InvalidProof();
+
+            rotationNonce[ghost_id] = nonce + 1;
         } else if (msg.sender == SESSION_MANAGER) {
             // Recovery path: authorization comes from SessionManager.recoveryRotate; proof MUST be empty.
             if (proof.length != 0) revert InvalidProof();
