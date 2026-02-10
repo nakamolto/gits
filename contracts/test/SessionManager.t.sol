@@ -938,20 +938,20 @@ contract SessionManagerTest is Test {
     }
 
     function _authDigest(uint64 attemptId, bytes32 checkpointCommitment, bytes memory pkNew) internal view returns (bytes32) {
-        return keccak256(abi.encode(keccak256(bytes("GITS_RECOVER_AUTH")), ghostId, attemptId, checkpointCommitment, keccak256(pkNew)));
+        return keccak256(abi.encode(keccak256(bytes("GITS_RECOVER_AUTH")), block.chainid, ghostId, attemptId, checkpointCommitment, keccak256(pkNew)));
     }
 
     function _shareDigests(uint64 attemptId) internal view returns (bytes32 dShare, bytes32 dAck) {
         GhostRecord memory g = ghostRegistry.getGhost(ghostId);
         dShare = keccak256(
-            abi.encode(keccak256(bytes("GITS_SHARE")), ghostId, attemptId, g.checkpoint_commitment, g.envelope_commitment)
+            abi.encode(keccak256(bytes("GITS_SHARE")), block.chainid, ghostId, attemptId, g.checkpoint_commitment, g.envelope_commitment)
         );
         dAck = keccak256(
-            abi.encode(keccak256(bytes("GITS_SHARE_ACK")), ghostId, attemptId, g.checkpoint_commitment, g.envelope_commitment)
+            abi.encode(keccak256(bytes("GITS_SHARE_ACK")), block.chainid, ghostId, attemptId, g.checkpoint_commitment, g.envelope_commitment)
         );
     }
 
-    function _recoverAuthDigest(bytes32 ghost_id, uint64 attempt_id, bytes32 checkpoint_commitment, bytes memory pk_new) internal pure returns (bytes32) {
-        return keccak256(abi.encode(keccak256(bytes("GITS_RECOVER_AUTH")), ghost_id, attempt_id, checkpoint_commitment, keccak256(pk_new)));
+    function _recoverAuthDigest(bytes32 ghost_id, uint64 attempt_id, bytes32 checkpoint_commitment, bytes memory pk_new) internal view returns (bytes32) {
+        return keccak256(abi.encode(keccak256(bytes("GITS_RECOVER_AUTH")), block.chainid, ghost_id, attempt_id, checkpoint_commitment, keccak256(pk_new)));
     }
 }

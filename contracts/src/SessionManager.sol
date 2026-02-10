@@ -264,7 +264,7 @@ contract SessionManager is ISessionManager, ReentrancyGuard {
         (bool staging, uint256 parent_id) = _computeStagingOpen(ghost_id, shell_id, now_epoch);
         uint256 residency_start_epoch = _computeResidencyStartEpoch(ghost_id, shell_id, now_epoch, staging);
 
-        bool passport_bonus_applies = _computePassportBonusApplies(ghost_id, shell_id, now_epoch);
+        bool passport_bonus_applies = _computePassportBonusApplies(ghost_id, shell_id, now_epoch, staging);
 
         uint256 session_id = _nextSessionId++;
         SessionState storage s = _sessions[session_id];
@@ -903,12 +903,13 @@ contract SessionManager is ISessionManager, ReentrancyGuard {
         return now_epoch;
     }
 
-    function _computePassportBonusApplies(bytes32 ghost_id, bytes32 shell_id, uint256 now_epoch) internal returns (bool) {
+    function _computePassportBonusApplies(bytes32 ghost_id, bytes32 shell_id, uint256 now_epoch, bool staging) internal returns (bool) {
         _bloomRotateIfNeeded(ghost_id, now_epoch);
         bool seen_recently = _bloomContains(ghost_id, shell_id);
         bool ghost_eligible = GHOST_REGISTRY.ghostPassportEligible(ghost_id, now_epoch);
         bool passport_bonus_applies = (!seen_recently) && ghost_eligible;
-        _bloomInsert(ghost_id, shell_id);
+        // V1: skip Bloom insert for staging sessions to prevent pollution on migration cancel.
+        if (!staging) _bloomInsert(ghost_id, shell_id);
         return passport_bonus_applies;
     }
 
@@ -954,6 +955,9 @@ contract SessionManager is ISessionManager, ReentrancyGuard {
         return g.recovery_config.recovery_set.length != 0;
     }
 
+    /// @dev V1 simplification: shell_id = zero-padded operator address.
+    ///      In v2, shell_id will be keccak256(TAG_SHELL_ID, identity_pubkey, salt)
+    ///      with registry lookups for address resolution.
     function _shellIdFromSender(address sender) internal pure returns (bytes32) {
         return bytes32(uint256(uint160(sender)));
     }
@@ -1129,7 +1133,7 @@ contract SessionManager is ISessionManager, ReentrancyGuard {
         bytes32[] calldata rs_list,
         AuthSig[] calldata sigs
     ) internal view {
-        bytes32 digest = keccak256(abi.encode(TAG_RECOVER_AUTH, a.ghost_id, a.attempt_id, a.checkpoint_commitment, keccak256(new_identity_pubkey)));
+        bytes32 digest = keccak256(abi.encode(TAG_RECOVER_AUTH, block.chainid, a.ghost_id, a.attempt_id, a.checkpoint_commitment, keccak256(new_identity_pubkey)));
 
         uint256 required = uint256(a.t_required);
         if (required == 0) return;
@@ -1160,8 +1164,8 @@ contract SessionManager is ISessionManager, ReentrancyGuard {
     }
 
     function _verifyShareReceipts(RecoveryAttempt storage a, bytes32[] calldata rs_list, ShareReceipt[] calldata receipts) internal view {
-        bytes32 d1 = keccak256(abi.encode(TAG_SHARE, a.ghost_id, a.attempt_id, a.checkpoint_commitment, a.envelope_commitment));
-        bytes32 d2 = keccak256(abi.encode(TAG_SHARE_ACK, a.ghost_id, a.attempt_id, a.checkpoint_commitment, a.envelope_commitment));
+        bytes32 d1 = keccak256(abi.encode(TAG_SHARE, block.chainid, a.ghost_id, a.attempt_id, a.checkpoint_commitment, a.envelope_commitment));
+        bytes32 d2 = keccak256(abi.encode(TAG_SHARE_ACK, block.chainid, a.ghost_id, a.attempt_id, a.checkpoint_commitment, a.envelope_commitment));
 
         uint256 required = uint256(a.t_required);
         if (required == 0) return;
@@ -1190,8 +1194,8 @@ contract SessionManager is ISessionManager, ReentrancyGuard {
         if (unique < required) revert NotEnoughShareReceipts(unique, required);
     }
 
-    function _recoverAuthDigest(bytes32 ghost_id, uint64 attempt_id, bytes32 checkpoint_commitment, bytes calldata pk_new) internal pure returns (bytes32) {
-        return keccak256(abi.encode(TAG_RECOVER_AUTH, ghost_id, attempt_id, checkpoint_commitment, keccak256(pk_new)));
+    function _recoverAuthDigest(bytes32 ghost_id, uint64 attempt_id, bytes32 checkpoint_commitment, bytes calldata pk_new) internal view returns (bytes32) {
+        return keccak256(abi.encode(TAG_RECOVER_AUTH, block.chainid, ghost_id, attempt_id, checkpoint_commitment, keccak256(pk_new)));
     }
 
     function _inBytes32Array(bytes32[] calldata arr, bytes32 x) internal pure returns (bool) {
