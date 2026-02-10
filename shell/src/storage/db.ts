@@ -87,6 +87,14 @@ export class ShellDb {
         id INTEGER PRIMARY KEY DEFAULT 1,
         last_block INTEGER NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS shamir_shares (
+        ghost_id BLOB NOT NULL,
+        share_index INTEGER NOT NULL,
+        encrypted_share BLOB NOT NULL,
+        received_epoch INTEGER NOT NULL,
+        PRIMARY KEY (ghost_id, share_index)
+      );
     `);
   }
 
@@ -118,4 +126,3 @@ export class ShellDb {
     return this.db;
   }
 }
-

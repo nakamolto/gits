@@ -5,6 +5,7 @@ import type { Hex } from 'viem';
 import type { Policy, SessionParams } from '../../sdk/src/types/structs.js';
 
 import { LocalPolicyState } from '../src/config/policy.js';
+import { GhostDB } from '../src/storage/db.js';
 import { EscrowManager, requiredEscrow } from '../src/wallet/escrow.js';
 import { EscapeReservesViolation, SpendTracker } from '../src/wallet/spend-tracker.js';
 
@@ -26,6 +27,39 @@ function policy(overrides: Partial<Policy> = {}): Policy {
 }
 
 describe('SpendTracker', () => {
+  it('SpendTracker with persistence survives restart', () => {
+    const db = new GhostDB(':memory:');
+    try {
+      const ghostIdBytes = Buffer.from(ZERO32.slice(2), 'hex');
+
+      const st1 = new SpendTracker(db, ghostIdBytes);
+      st1.loadEpoch(5n);
+      st1.recordSpend(123n);
+
+      const st2 = new SpendTracker(db, ghostIdBytes);
+      st2.loadEpoch(5n);
+      expect(st2.spentThisEpoch).toBe(123n);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('SpendTracker without store works in-memory', () => {
+    const st = new SpendTracker();
+    st.recordSpend(5n);
+    expect(st.spentThisEpoch).toBe(5n);
+  });
+
+  it('SpendTracker.loadEpoch auto-resets on new epoch', () => {
+    const st = new SpendTracker();
+    st.loadEpoch(5n);
+    st.recordSpend(10n);
+    expect(st.spentThisEpoch).toBe(10n);
+
+    st.loadEpoch(6n);
+    expect(st.spentThisEpoch).toBe(0n);
+  });
+
   it('canSpend at limit', () => {
     const st = new SpendTracker();
     const p = policy({ hot_allowance: 100n });
@@ -111,4 +145,3 @@ describe('Escrow', () => {
     expect(wallet.fundNextEpoch).not.toHaveBeenCalled();
   });
 });
-
