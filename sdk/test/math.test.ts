@@ -35,6 +35,12 @@ describe('EpochClock', () => {
     expect(c.epochEnd(1n)).toBe(1019n);
   });
 
+  it('epochAt throws pre-genesis (matches contract revert)', () => {
+    const c = new EpochClock(1000n, 10n);
+    expect(() => c.epochAt(999n)).toThrow('EpochClock: pre-genesis');
+    expect(() => c.epochAt(0n)).toThrow('EpochClock: pre-genesis');
+  });
+
   it('secondsRemaining (fake timers)', () => {
     vi.useFakeTimers();
     try {

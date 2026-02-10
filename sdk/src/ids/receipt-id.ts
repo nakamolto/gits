@@ -1,8 +1,8 @@
 import { encodeAbiParameters, keccak256, toBytes } from 'viem';
 import type { Address, Hex } from 'viem';
 
-// Part 3 spec, Section 10.5.2: receipt_id = keccak256(abi.encode(keccak256(bytes("GITS_RECEIPT")), ...))
-const TAG_HASH = keccak256(toBytes('GITS_RECEIPT'));
+// Part 3 spec, Section 10.5.2: receipt_id = keccak256(abi.encode(keccak256(bytes("GITS_RECEIPT_ID")), ...))
+const TAG_HASH = keccak256(toBytes('GITS_RECEIPT_ID'));
 
 export function deriveReceiptId(
   chain_id: bigint,

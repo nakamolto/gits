@@ -42,7 +42,7 @@ describe('ID derivation', () => {
       42n,
     );
 
-    expect(receipt_id).toBe('0x8e1e3971dd8fd4082cf0264b6e6de075487f8266a2cdb016f05b61172d400e2a');
+    expect(receipt_id).toBe('0x1b1bb0b65b8b6567f725a5ea53b7a8ec59e31969e391d97b8a9da484ae9f8e4e');
   });
 });
 

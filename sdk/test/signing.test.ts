@@ -6,6 +6,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { heartbeatDigest, signHeartbeat } from '../src/signing/heartbeat.js';
 import { shareAckDigest, shareDigest } from '../src/signing/digests.js';
 import { logLeafHash, logNodeHash } from '../src/signing/receipt.js';
+import { ghostRotateSignerDigest } from '../src/signing/rotation.js';
 
 import { part3_14_9 } from './vectors/part3_14_9.js';
 
@@ -86,6 +87,26 @@ describe('Signing digests (Part 3 vectors)', () => {
       sR: 0,
     });
     expect(node).toBe(part3_14_9.vector_e.expected);
+  });
+
+  it('ghostRotateSignerDigest: deterministic with nonce replay prevention', () => {
+    const ghost_id = part3_14_9.vector_b.ghost_id;
+    const new_pubkey = '0xaabbccdd' as `0x${string}`;
+    const chain_id = part3_14_9.chain_id;
+    const nonce = 0n;
+
+    // Deterministic: same inputs → same output
+    const d1 = ghostRotateSignerDigest({ ghost_id, new_identity_pubkey: new_pubkey, chain_id, nonce });
+    const d2 = ghostRotateSignerDigest({ ghost_id, new_identity_pubkey: new_pubkey, chain_id, nonce });
+    expect(d1).toBe(d2);
+
+    // Different nonce → different digest (replay prevention)
+    const d3 = ghostRotateSignerDigest({ ghost_id, new_identity_pubkey: new_pubkey, chain_id, nonce: 1n });
+    expect(d3).not.toBe(d1);
+
+    // Different chain_id → different digest (cross-chain replay prevention)
+    const d4 = ghostRotateSignerDigest({ ghost_id, new_identity_pubkey: new_pubkey, chain_id: 1n, nonce });
+    expect(d4).not.toBe(d1);
   });
 
   it('signHeartbeat: signature recovers signer address', async () => {

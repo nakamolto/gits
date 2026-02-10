@@ -9,7 +9,7 @@ export class EpochClock {
   }
 
   epochAt(timestamp_sec: bigint): bigint {
-    if (timestamp_sec <= this.genesis_time) return 0n;
+    if (timestamp_sec < this.genesis_time) throw new Error('EpochClock: pre-genesis');
     return (timestamp_sec - this.genesis_time) / this.epoch_length;
   }
 
