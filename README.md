@@ -15,6 +15,21 @@ Three documents:
 - **Part 2 — Economics:** Token model, adversarial analysis, deployment milestones
 - **Part 3 — Implementation spec:** Contract interfaces, fraud proofs, recovery, test vectors
 
+## Repository structure
+
+```
+src/
+  interfaces/     # Normative Solidity interfaces (Section 14 of the spec)
+  types/          # Shared structs, enums, and constants
+```
+
+## Build
+
+```bash
+forge build
+forge test
+```
+
 ## Key ideas
 
 - **Credible exit.** A Ghost's custody on any single host is time-bounded and its potential loss is economically bounded.
