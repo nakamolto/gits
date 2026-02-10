@@ -827,6 +827,10 @@ contract SessionManager is ISessionManager, ReentrancyGuard {
         return _activeRecoveryInitiatorCount[shell_id] > 0;
     }
 
+    function getRecoveryAttempt(bytes32 ghost_id, uint64 attempt_id) external view override returns (RecoveryAttempt memory) {
+        return _recoveryAttemptByGhostById[ghost_id][attempt_id];
+    }
+
     function processExpiry(bytes32 ghost_id) external override nonReentrant {
         _processExpiryInternal(ghost_id);
     }
