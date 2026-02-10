@@ -245,10 +245,10 @@ export class ShellDaemon {
           }
           const body = await readJson(req);
           const out = await this.heartbeat.handleHeartbeat({
-            sessionId: String(body.sessionId),
+            sessionId: String(body.session_id ?? body.sessionId),
             epoch: String(body.epoch),
-            intervalIndex: String(body.intervalIndex),
-            sigGhost: body.sigGhost,
+            intervalIndex: String(body.interval_index ?? body.intervalIndex),
+            sigGhost: body.sig_ghost ?? body.sigGhost,
           });
           return writeJson(res, 200, out);
         }
