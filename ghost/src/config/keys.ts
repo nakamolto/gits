@@ -3,8 +3,8 @@ import { privateKeyToAccount } from 'viem/accounts';
 import type { Hex } from 'viem';
 import type { LocalAccount } from 'viem/accounts';
 import * as secp from '@noble/secp256k1';
-import { hkdf } from '@noble/hashes/hkdf';
-import { sha256 } from '@noble/hashes/sha256';
+import { hkdf } from '@noble/hashes/hkdf.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 
 import { decryptFromFile } from '../storage/secure-store.js';
 
