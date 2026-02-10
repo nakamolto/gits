@@ -11,3 +11,5 @@ export * from './storage/secure-store.js';
 
 export * from './telemetry/metrics.js';
 export * from './telemetry/health.js';
+
+export * as migration from './migration/index.js';
