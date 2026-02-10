@@ -53,6 +53,14 @@ interface IGhostRegistry {
     /// @notice Update recovery configuration. msg.sender MUST equal the Ghost's wallet.
     function setRecoveryConfig(bytes32 ghost_id, RecoveryConfig calldata recoveryConfig) external;
 
+    // ─── Reward History Credit ─────────────────────────────────────────────
+
+    /// @notice Credit cumulative reward history for a Ghost. Callable ONLY by RewardsManager.
+    function recordRewardCredit(bytes32 ghost_id, uint256 amount) external;
+
+    /// @notice Cumulative reward credits for a Ghost (used for passport eligibility).
+    function cumulativeRewards(bytes32 ghost_id) external view returns (uint256);
+
     // ─── Views ───────────────────────────────────────────────────────────────
 
     function getGhost(bytes32 ghost_id) external view returns (GhostRecord memory);
