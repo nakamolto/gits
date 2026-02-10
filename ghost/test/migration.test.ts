@@ -9,7 +9,7 @@ import type { Address, Hex } from 'viem';
 
 import { MigrationExecutor } from '../src/migration/executor.js';
 import { rankOffers } from '../src/migration/offer-discovery.js';
-import { plan as planFn, scoreOffer, shouldMigrate } from '../src/migration/planner.js';
+import { scoreOffer, shouldMigrate } from '../src/migration/planner.js';
 import { BundleHashMismatchError } from '../src/migration/state-packager.js';
 import { package as packageState, restore as restoreState } from '../src/migration/state-packager.js';
 import type {
