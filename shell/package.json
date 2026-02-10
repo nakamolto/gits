@@ -1,0 +1,34 @@
+{
+  "name": "@gits-protocol/shell",
+  "version": "0.0.0",
+  "description": "GITS Shell daemon components",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "pretest": "npm --prefix ../sdk install --no-package-lock && npm --prefix ../sdk run build",
+    "test": "vitest run",
+    "prebuild": "npm --prefix ../sdk install --no-package-lock && npm --prefix ../sdk run build",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@gits-protocol/sdk": "file:../sdk",
+    "viem": "^2.45.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.2",
+    "sql.js": "^1.13.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
