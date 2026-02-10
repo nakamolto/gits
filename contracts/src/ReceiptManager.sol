@@ -39,6 +39,18 @@ contract ReceiptManager is IReceiptManager, ReentrancyGuard {
     error UnsupportedSigAlg(uint8 sig_alg);
 
     // ─────────────────────────────────────────────────────────────────────────────
+    // Events
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    event CandidateSubmitted(uint256 indexed session_id, uint256 indexed epoch, uint256 candidate_id, address submitter, uint32 su_delivered);
+    event CandidateEvictedEvent(uint256 indexed session_id, uint256 indexed epoch, uint256 candidate_id);
+    event CandidateDisqualifiedEvent(uint256 indexed session_id, uint256 indexed epoch, uint256 candidate_id, address challenger);
+    event DAChallenged(uint256 indexed session_id, uint256 indexed epoch, uint256 candidate_id, address challenger);
+    event DAPublished(uint256 indexed session_id, uint256 indexed epoch, uint256 candidate_id, address responder);
+    event DAResolved(uint256 indexed session_id, uint256 indexed epoch, uint256 candidate_id);
+    event ReceiptFinalized(uint256 indexed session_id, uint256 indexed epoch, bytes32 receipt_id, uint32 su_delivered, address submitter, uint256 weight_q);
+
+    // ─────────────────────────────────────────────────────────────────────────────
     // External references
     // ─────────────────────────────────────────────────────────────────────────────
 
@@ -82,7 +94,7 @@ contract ReceiptManager is IReceiptManager, ReentrancyGuard {
     bytes32 internal constant TAG_HEARTBEAT = keccak256(bytes("GITS_HEARTBEAT"));
     bytes32 internal constant TAG_LOG_LEAF = keccak256(bytes("GITS_LOG_LEAF"));
     bytes32 internal constant TAG_LOG_NODE = keccak256(bytes("GITS_LOG_NODE"));
-    bytes32 internal constant TAG_RECEIPT_ID = keccak256(bytes("GITS_RECEIPT"));
+    bytes32 internal constant TAG_RECEIPT_ID = keccak256(bytes("GITS_RECEIPT_ID"));
 
     // Q64.64 scaling constant
     uint256 internal constant Q64 = 1 << 64;
@@ -333,6 +345,8 @@ contract ReceiptManager is IReceiptManager, ReentrancyGuard {
             _evictCandidate(session_id, epoch, evictedId);
         }
 
+        emit CandidateSubmitted(session_id, epoch, candidate_id, msg.sender, candidate.su_delivered);
+
         // Initialize or update challenge window.
         Window storage w = _window[session_id][epoch];
         if (w.start_epoch == 0 && w.end_epoch == 0) {
@@ -463,6 +477,8 @@ contract ReceiptManager is IReceiptManager, ReentrancyGuard {
         }
 
         _pendingDAByEpoch[epoch] += 1;
+
+        emit DAChallenged(session_id, epoch, candidate_id, msg.sender);
     }
 
     function publishReceiptLog(uint256 session_id, uint256 epoch, uint256 candidate_id, bytes calldata encoded_log)
@@ -495,6 +511,8 @@ contract ReceiptManager is IReceiptManager, ReentrancyGuard {
         da.bond = 0;
         _sendValue(msg.sender, payout);
 
+        emit DAPublished(session_id, epoch, candidate_id, msg.sender);
+
         // Restart challenge window (extension) per spec if cap not reached.
         Window storage w = _window[session_id][epoch];
         if (w.extensions_used < MAX_CHALLENGE_EXTENSIONS) {
@@ -514,6 +532,8 @@ contract ReceiptManager is IReceiptManager, ReentrancyGuard {
         // Disqualify + slash receipt bond, pay challenger reward, burn remainder, and return B_DA in full.
         // (The internal helper auto-resolves the DA challenge when disqualifying the challenged candidate.)
         _disqualifyAndSlashCandidate(session_id, epoch, candidate_id, da.challenger);
+
+        emit DAResolved(session_id, epoch, candidate_id);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -527,15 +547,7 @@ contract ReceiptManager is IReceiptManager, ReentrancyGuard {
 
         FinalizationData memory r = _prepareFinalization(session_id, epoch, nowEpoch);
 
-        // Settle rent/escrow.
-        sessionManager.settleEpoch(session_id, epoch, r.su_delivered);
-
-        // Record receipt for rewards accounting.
-        rewardsManager.recordReceipt(r.receipt_id, epoch, r.ghost_id, r.shell_id, r.su_delivered, r.weight_q);
-
-        // Return receipt bonds to winner + runner-ups.
-        _refundCandidateBonds(session_id, epoch);
-
+        // CEI: write state BEFORE external calls.
         _finalized[session_id][epoch] = true;
         _finalReceipts[session_id][epoch] = FinalReceipt({
             receipt_id: r.receipt_id,
@@ -547,6 +559,13 @@ contract ReceiptManager is IReceiptManager, ReentrancyGuard {
             shell_reward_eligible: r.shell_reward_eligible,
             weight_q: r.weight_q
         });
+
+        // Interactions: external calls after state is finalized.
+        sessionManager.settleEpoch(session_id, epoch, r.su_delivered);
+        rewardsManager.recordReceipt(r.receipt_id, epoch, r.ghost_id, r.shell_id, r.su_delivered, r.weight_q);
+        _refundCandidateBonds(session_id, epoch);
+
+        emit ReceiptFinalized(session_id, epoch, r.receipt_id, r.su_delivered, r.submitter, r.weight_q);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -709,6 +728,8 @@ contract ReceiptManager is IReceiptManager, ReentrancyGuard {
         uint256 refundBond = c.bond;
         c.bond = 0;
         _sendValue(c.submitter, refundBond);
+
+        emit CandidateEvictedEvent(session_id, epoch, candidate_id);
     }
 
     function _removeCandidateId(uint256 session_id, uint256 epoch, uint256 candidate_id) internal returns (bool wasBest) {
@@ -738,6 +759,8 @@ contract ReceiptManager is IReceiptManager, ReentrancyGuard {
 
         bool wasBest = _removeCandidateId(session_id, epoch, candidate_id);
         c.disqualified = true;
+
+        emit CandidateDisqualifiedEvent(session_id, epoch, candidate_id, challenger);
 
         // If DA pending on this candidate, auto-resolve and return B_DA to DA challenger.
         DAChallenge storage da = _da[session_id][epoch];
