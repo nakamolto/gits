@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IERC20} from "forge-std/interfaces/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /// @title IGIT — GIT Token Interface
 /// @notice Minimal normative interface for the GITS reward token (Section 13.3).
 /// @dev GIT is ERC-20 with decimals=18. No burn, no pause, no upgrade, no owner.
 ///      The adaptive sink is implemented as mint reduction (RewardsManager mints only R_net).
 ///      Slashed bond amounts are hard assets (not GIT) burned via protocol burn address.
-interface IGIT is IERC20 {
+interface IGIT is IERC20Metadata {
     /// @notice Mint new GIT tokens. Callable ONLY by minter() (RewardsManager).
     /// @param to Recipient address.
     /// @param amount Amount to mint (in base units, 18 decimals).
