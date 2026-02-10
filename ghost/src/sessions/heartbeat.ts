@@ -4,6 +4,7 @@ import { recoverPublicKey } from 'viem';
 import { heartbeatDigest } from '@gits-protocol/sdk';
 
 export type HeartbeatRequest = {
+  type: 'HeartbeatRequest';
   session_id: string; // bigint (decimal) serialized for JSON
   epoch: string; // bigint (decimal) serialized for JSON
   interval_index: number;
@@ -11,10 +12,13 @@ export type HeartbeatRequest = {
 };
 
 export type HeartbeatResponse = {
+  type: 'HeartbeatResponse';
   session_id: string;
   epoch: string;
   interval_index: number;
-  sig_shell: Hex;
+  accepted: boolean;
+  sig_shell?: Hex;
+  reason: string | null;
 };
 
 export type IntervalRecord = {
@@ -56,17 +60,24 @@ function parseHeartbeatResponse(line: string): HeartbeatResponse | null {
 
   if (!isRecord(parsed)) return null;
 
-  const { session_id, epoch, interval_index, sig_shell } = parsed;
+  const { type, session_id, epoch, interval_index, accepted, sig_shell, reason } = parsed;
+  if (type !== 'HeartbeatResponse') return null;
   if (typeof session_id !== 'string') return null;
   if (typeof epoch !== 'string') return null;
   if (typeof interval_index !== 'number' || !Number.isInteger(interval_index) || interval_index < 0) return null;
-  if (typeof sig_shell !== 'string') return null;
+  if (typeof accepted !== 'boolean') return null;
+  if (!(typeof reason === 'string' || reason === null)) return null;
+  if (accepted === true && typeof sig_shell !== 'string') return null;
+  if (sig_shell !== undefined && typeof sig_shell !== 'string') return null;
 
   return {
+    type: 'HeartbeatResponse',
     session_id,
     epoch,
     interval_index,
-    sig_shell: sig_shell as Hex,
+    accepted,
+    sig_shell: sig_shell as Hex | undefined,
+    reason,
   };
 }
 
@@ -248,6 +259,7 @@ export class HeartbeatLoop {
       const sig_ghost = await this.signer.sign(digest);
 
       const req: HeartbeatRequest = {
+        type: 'HeartbeatRequest',
         session_id: this.session_id.toString(),
         epoch: epoch.toString(),
         interval_index,
@@ -274,8 +286,10 @@ export class HeartbeatLoop {
         resp.interval_index !== req.interval_index
       ) {
         this.onAnomaly?.({ epoch, interval_index, reason: 'invalid_response' });
+      } else if (resp.accepted !== true) {
+        this.onAnomaly?.({ epoch, interval_index, reason: resp.reason ?? 'rejected' });
       } else {
-        sig_shell = resp.sig_shell;
+        sig_shell = resp.sig_shell ?? '0x';
 
         try {
           const recovered = await recoverPublicKey({ hash: digest, signature: sig_shell });

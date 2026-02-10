@@ -88,6 +88,8 @@ describe('HeartbeatLoop', () => {
       const req = JSON.parse(line);
       lastReq = req;
 
+      expect(req.type).toEqual('HeartbeatRequest');
+
       const reqSessionId = BigInt(req.session_id);
       const reqEpoch = BigInt(req.epoch);
       const reqInterval = BigInt(req.interval_index);
@@ -104,10 +106,13 @@ describe('HeartbeatLoop', () => {
 
       socket.write(
         `${JSON.stringify({
+          type: 'HeartbeatResponse',
           session_id: req.session_id,
           epoch: req.epoch,
           interval_index: req.interval_index,
+          accepted: true,
           sig_shell: sigShell,
+          reason: null,
         })}\n`,
       );
 
@@ -148,6 +153,7 @@ describe('HeartbeatLoop', () => {
     await hb.tickOnce();
 
     expect(lastReq).not.toBeNull();
+    expect(lastReq.type).toEqual('HeartbeatRequest');
     expect(lastReq.session_id).toEqual(session_id.toString());
     expect(lastReq.epoch).toEqual(epoch.toString());
     expect(lastReq.interval_index).toEqual(interval_index);
@@ -160,6 +166,102 @@ describe('HeartbeatLoop', () => {
     expect(store.inserted[0].sig_shell).not.toEqual('0x');
 
     await new Promise<void>((resolve) => server!.close(() => resolve()));
+  });
+
+  it('records v_i=0 and logs reason if shell rejects the heartbeat', async () => {
+    const chain_id = 1n;
+    const session_id = 123n;
+    const epoch = 7n;
+    const interval_index = 3;
+
+    const nowMs = 3_000;
+    const epochStartSeconds = 0;
+
+    const ghostAccount = privateKeyToAccount(`0x${'11'.repeat(32)}`);
+    const shellAccount = privateKeyToAccount(`0x${'22'.repeat(32)}`);
+
+    const digest = heartbeatDigest({
+      chain_id,
+      session_id,
+      epoch,
+      interval_index: BigInt(interval_index),
+    });
+
+    let anomaly: any = null;
+
+    const server = createServer(async (socket) => {
+      const line = await readOneLine(socket);
+      const req = JSON.parse(line);
+      expect(req.type).toEqual('HeartbeatRequest');
+
+      const reqSessionId = BigInt(req.session_id);
+      const reqEpoch = BigInt(req.epoch);
+      const reqInterval = BigInt(req.interval_index);
+
+      const d = heartbeatDigest({
+        chain_id,
+        session_id: reqSessionId,
+        epoch: reqEpoch,
+        interval_index: reqInterval,
+      });
+
+      // Even if the response includes a sig_shell, Ghost must ignore it when accepted=false.
+      const sigShell = (await shellAccount.sign({ hash: d })) as Hex;
+
+      socket.write(
+        `${JSON.stringify({
+          type: 'HeartbeatResponse',
+          session_id: req.session_id,
+          epoch: req.epoch,
+          interval_index: req.interval_index,
+          accepted: false,
+          sig_shell: sigShell,
+          reason: 'replay',
+        })}\n`,
+      );
+    });
+
+    await new Promise<void>((resolve) => server.listen(socketPath, resolve));
+
+    const store = new MemoryIntervalStore();
+
+    const shellPubkey = await recoverPublicKey({ hash: digest, signature: (await shellAccount.sign({ hash: digest })) as Hex });
+
+    const hb = new HeartbeatLoop({
+      chain_id,
+      session_id,
+      shell_session_key: shellPubkey,
+      heartbeatMs: 1000,
+      nowMs: () => nowMs,
+      epochProvider: {
+        async getCurrentEpoch() {
+          return epoch;
+        },
+        async getEpochStartSeconds() {
+          return epochStartSeconds;
+        },
+      },
+      signer: {
+        async sign(hash) {
+          return (await ghostAccount.sign({ hash })) as Hex;
+        },
+      },
+      ipc: new NetHeartbeatIpcClient(socketPath),
+      store,
+      onAnomaly: (info) => {
+        anomaly = info;
+      },
+    });
+
+    await hb.tickOnce();
+
+    expect(store.inserted).toHaveLength(1);
+    expect(store.inserted[0].interval_index).toEqual(interval_index);
+    expect(store.inserted[0].v_i).toEqual(0);
+    expect(store.inserted[0].sig_shell).toEqual('0x');
+    expect(anomaly?.reason).toEqual('replay');
+
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
   it('records v_i=0 if shell signature does not match shell_session_key', async () => {
@@ -183,6 +285,7 @@ describe('HeartbeatLoop', () => {
     const server = createServer(async (socket) => {
       const line = await readOneLine(socket);
       const req = JSON.parse(line);
+      expect(req.type).toEqual('HeartbeatRequest');
 
       const d = heartbeatDigest({
         chain_id,
@@ -195,10 +298,13 @@ describe('HeartbeatLoop', () => {
 
       socket.write(
         `${JSON.stringify({
+          type: 'HeartbeatResponse',
           session_id: req.session_id,
           epoch: req.epoch,
           interval_index: req.interval_index,
+          accepted: true,
           sig_shell: sigShell,
+          reason: null,
         })}\n`,
       );
     });

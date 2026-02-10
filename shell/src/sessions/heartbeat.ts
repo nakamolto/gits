@@ -164,20 +164,20 @@ export class HeartbeatService {
 
 export type NetHeartbeatRequest = {
   type: 'HeartbeatRequest';
-  sessionId: string;
+  session_id: string;
   epoch: string;
-  intervalIndex: string;
-  sigGhost: Hex;
+  interval_index: number;
+  sig_ghost: Hex;
 };
 
 export type NetHeartbeatResponse = {
   type: 'HeartbeatResponse';
-  sessionId: string;
+  session_id: string;
   epoch: string;
-  intervalIndex: string;
+  interval_index: number;
   accepted: boolean;
-  sigShell?: Hex;
-  reason?: string;
+  sig_shell?: Hex;
+  reason: string | null;
 };
 
 export class NetHeartbeatServer {
@@ -209,34 +209,105 @@ export class NetHeartbeatServer {
           buf = buf.slice(idx + 1);
           if (line.trim().length === 0) continue;
 
-          let msg: NetHeartbeatRequest;
+          let parsed: unknown;
           try {
-            msg = JSON.parse(line) as NetHeartbeatRequest;
+            parsed = JSON.parse(line);
           } catch {
-            socket.write(JSON.stringify({ type: 'HeartbeatResponse', accepted: false, reason: 'bad_json' }) + '\n');
+            const out: NetHeartbeatResponse = {
+              type: 'HeartbeatResponse',
+              session_id: '0',
+              epoch: '0',
+              interval_index: 0,
+              accepted: false,
+              reason: 'bad_json',
+            };
+            socket.write(JSON.stringify(out) + '\n');
             continue;
           }
+
+          if (typeof parsed !== 'object' || parsed === null) {
+            const out: NetHeartbeatResponse = {
+              type: 'HeartbeatResponse',
+              session_id: '0',
+              epoch: '0',
+              interval_index: 0,
+              accepted: false,
+              reason: 'bad_request',
+            };
+            socket.write(JSON.stringify(out) + '\n');
+            continue;
+          }
+
+          const msg = parsed as Record<string, unknown>;
+
+          const safeSessionId = typeof msg.session_id === 'string' ? msg.session_id : '0';
+          const safeEpoch = typeof msg.epoch === 'string' ? msg.epoch : '0';
+          const safeInterval =
+            typeof msg.interval_index === 'number' && Number.isInteger(msg.interval_index) && msg.interval_index >= 0 ? msg.interval_index : 0;
 
           if (msg.type !== 'HeartbeatRequest') {
-            socket.write(JSON.stringify({ type: 'HeartbeatResponse', accepted: false, reason: 'bad_type' }) + '\n');
+            const out: NetHeartbeatResponse = {
+              type: 'HeartbeatResponse',
+              session_id: safeSessionId,
+              epoch: safeEpoch,
+              interval_index: safeInterval,
+              accepted: false,
+              reason: 'bad_type',
+            };
+            socket.write(JSON.stringify(out) + '\n');
             continue;
           }
 
-          const res = await this.service.handleHeartbeat({
-            sessionId: msg.sessionId,
-            epoch: msg.epoch,
-            intervalIndex: msg.intervalIndex,
-            sigGhost: msg.sigGhost,
-          });
+          if (
+            typeof msg.session_id !== 'string' ||
+            typeof msg.epoch !== 'string' ||
+            typeof msg.interval_index !== 'number' ||
+            !Number.isInteger(msg.interval_index) ||
+            msg.interval_index < 0 ||
+            typeof msg.sig_ghost !== 'string'
+          ) {
+            const out: NetHeartbeatResponse = {
+              type: 'HeartbeatResponse',
+              session_id: safeSessionId,
+              epoch: safeEpoch,
+              interval_index: safeInterval,
+              accepted: false,
+              reason: 'bad_request',
+            };
+            socket.write(JSON.stringify(out) + '\n');
+            continue;
+          }
+
+          // Net layer is snake_case and uses interval_index:number; service layer stays camelCase with intervalIndex:string.
+          let res: HeartbeatResponse;
+          try {
+            res = await this.service.handleHeartbeat({
+              sessionId: msg.session_id,
+              epoch: msg.epoch,
+              intervalIndex: String(msg.interval_index),
+              sigGhost: msg.sig_ghost as Hex,
+            });
+          } catch {
+            const out: NetHeartbeatResponse = {
+              type: 'HeartbeatResponse',
+              session_id: msg.session_id,
+              epoch: msg.epoch,
+              interval_index: msg.interval_index,
+              accepted: false,
+              reason: 'internal_error',
+            };
+            socket.write(JSON.stringify(out) + '\n');
+            continue;
+          }
 
           const out: NetHeartbeatResponse = {
             type: 'HeartbeatResponse',
-            sessionId: msg.sessionId,
+            session_id: msg.session_id,
             epoch: msg.epoch,
-            intervalIndex: msg.intervalIndex,
+            interval_index: msg.interval_index,
             accepted: res.accepted,
-            sigShell: res.sigShell,
-            reason: res.reason,
+            sig_shell: res.accepted ? res.sigShell : undefined,
+            reason: res.accepted ? null : (res.reason ?? 'rejected'),
           };
           socket.write(JSON.stringify(out) + '\n');
         }
