@@ -1,0 +1,22 @@
+{
+  "name": "@gits-protocol/ghost",
+  "version": "0.0.0",
+  "description": "Ghost daemon (local)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@gits-protocol/sdk": "file:../sdk",
+    "viem": "^2.45.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
