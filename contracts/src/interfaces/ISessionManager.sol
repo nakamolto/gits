@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {SessionParams, SessionState, RBC, AuthSig, ShareReceipt} from "../types/GITSTypes.sol";
+import {SessionParams, SessionState, RecoveryAttempt, RBC, AuthSig, ShareReceipt} from "../types/GITSTypes.sol";
 
 /// @title ISessionManager — Session Lifecycle, Migration, and Recovery
 /// @notice Tracks session state, leases, residency, trust-refresh, migration, and recovery (Section 14.4).
@@ -68,6 +68,7 @@ interface ISessionManager {
     function effectiveTenureExpiry(bytes32 ghost_id) external view returns (uint256);
     function isRefreshAnchor(bytes32 ghost_id, bytes32 shell_id) external view returns (bool);
     function isActiveRecoveryInitiator(bytes32 shell_id) external view returns (bool);
+    function getRecoveryAttempt(bytes32 ghost_id, uint64 attempt_id) external view returns (RecoveryAttempt memory);
     function processExpiry(bytes32 ghost_id) external;
 
     // ─── Events ──────────────────────────────────────────────────────────────

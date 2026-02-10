@@ -1,0 +1,51 @@
+{
+  "name": "@gits-protocol/ghost",
+  "version": "0.0.0",
+  "description": "Ghost daemon for the GITS protocol",
+  "type": "module",
+  "main": "./dist/exports.js",
+  "types": "./dist/exports.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/exports.d.ts",
+      "import": "./dist/exports.js"
+    },
+    "./cli": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "gits-ghost": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "pretest": "npm --prefix ../sdk install && npm --prefix ../sdk run build",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@gits-protocol/sdk": "file:../sdk",
+    "@noble/ciphers": "^2.1.1",
+    "@noble/curves": "^2.0.1",
+    "@noble/hashes": "^2.0.1",
+    "@noble/secp256k1": "^3.0.0",
+    "better-sqlite3": "^12.0.0",
+    "commander": "^14.0.0",
+    "pino": "^9.0.0",
+    "smol-toml": "^1.3.3",
+    "viem": "^2.45.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.2.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "author": "",
+  "license": "MIT"
+}
