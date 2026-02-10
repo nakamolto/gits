@@ -1,9 +1,11 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import zlib from 'node:zlib';
 
 import { keccak256, toHex } from 'viem';
+
+import { encrypt, decrypt } from '../vaulting/encryptor.js';
+import { encodeVaultBlob, decodeVaultBlob } from '../vaulting/encryptor.js';
 
 import type { MigrationBundle, PackagerOpts } from './types.js';
 
@@ -65,34 +67,6 @@ function ensureSafeRelPath(rel: string): string {
   return norm;
 }
 
-function encryptAes256Gcm(args: { key: Uint8Array; plaintext: Uint8Array }) {
-  const { key, plaintext } = args;
-  if (key.byteLength !== 32) throw new InvalidBundleError('vault key must be 32 bytes (AES-256-GCM)');
-
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-  const tag = cipher.getAuthTag();
-
-  return new Uint8Array(Buffer.concat([iv, tag, ciphertext]));
-}
-
-function decryptAes256Gcm(args: { key: Uint8Array; encrypted: Uint8Array }): Uint8Array {
-  const { key, encrypted } = args;
-  if (key.byteLength !== 32) throw new InvalidBundleError('vault key must be 32 bytes (AES-256-GCM)');
-  if (encrypted.byteLength < 12 + 16) throw new InvalidBundleError('encrypted bundle too short');
-
-  const buf = Buffer.from(encrypted);
-  const iv = buf.subarray(0, 12);
-  const tag = buf.subarray(12, 28);
-  const ciphertext = buf.subarray(28);
-
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(tag);
-  const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-  return new Uint8Array(plaintext);
-}
-
 export async function estimateBytes(agentDataDir: string): Promise<bigint> {
   const files = await walkFiles(agentDataDir);
   let total = 0n;
@@ -118,7 +92,8 @@ export async function packageState(agentDataDir: string, opts: PackagerOpts): Pr
 
   const json = Buffer.from(JSON.stringify(manifest), 'utf8');
   const payload = compression === 'gzip' ? zlib.gzipSync(json) : json;
-  const encryptedState = encryptAes256Gcm({ key: opts.key, plaintext: new Uint8Array(payload) });
+  const vault = encrypt(new Uint8Array(payload), opts.key);
+  const encryptedState = encodeVaultBlob(vault);
   const bundleHash = keccak256(toHex(encryptedState));
 
   return {
@@ -138,7 +113,8 @@ export async function restoreState(bundle: MigrationBundle, agentDataDir: string
   const computed = keccak256(toHex(bundle.encryptedState));
   if (computed !== bundle.bundleHash) throw new BundleHashMismatchError();
 
-  const plaintext = decryptAes256Gcm({ key: opts.key, encrypted: bundle.encryptedState });
+  const vault = decodeVaultBlob(bundle.encryptedState);
+  const plaintext = decrypt(vault, opts.key);
   const payload =
     bundle.metadata.compression === 'gzip' ? zlib.gunzipSync(Buffer.from(plaintext)) : Buffer.from(plaintext);
 

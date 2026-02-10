@@ -10,24 +10,20 @@ import { dirname, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import {
   decodeAbiParameters,
-  encodeAbiParameters,
   hexToBytes,
   keccak256,
   recoverAddress,
-  toBytes,
   toHex,
   type Address,
   type Hex,
 } from 'viem';
 
-import { encrypt, type EncryptedVault } from './encryptor.js';
+import { shareAckDigest, shareDigest, type ShareReceipt } from '@gits-protocol/sdk';
+
+import { encrypt, encodeVaultBlob, type EncryptedVault } from './encryptor.js';
 import { encodeShare, splitVaultKey, type ShamirShare } from './shamir.js';
 
-export type ShareReceipt = {
-  shell_id: Hex;
-  sig_shell: Hex;
-  sig_ack: Hex;
-};
+export type { ShareReceipt };
 
 export type RecoverySetMember = {
   shell_id: Hex;
@@ -99,66 +95,6 @@ export class FileStorageBackend implements StorageBackend {
     await writeFile(path, bytes);
     return path;
   }
-}
-
-function encodeVaultBlob(vault: EncryptedVault): Uint8Array {
-  // v1 wire format: version(1) || nonce(12) || tag(16) || ciphertext
-  if (vault.nonce.length !== 12) throw new Error(`InvalidNonceLength:${vault.nonce.length}`);
-  if (vault.tag.length !== 16) throw new Error(`InvalidTagLength:${vault.tag.length}`);
-  const out = new Uint8Array(1 + 12 + 16 + vault.ciphertext.length);
-  out[0] = 1;
-  out.set(vault.nonce, 1);
-  out.set(vault.tag, 1 + 12);
-  out.set(vault.ciphertext, 1 + 12 + 16);
-  return out;
-}
-
-function shareDigest(args: {
-  chain_id: bigint;
-  ghost_id: Hex;
-  attempt_id: bigint;
-  checkpoint_commitment: Hex;
-  envelope_commitment: Hex;
-}): Hex {
-  const TAG_SHARE = keccak256(toBytes('GITS_SHARE'));
-  const { chain_id, ghost_id, attempt_id, checkpoint_commitment, envelope_commitment } = args;
-  return keccak256(
-    encodeAbiParameters(
-      [
-        { type: 'bytes32' },
-        { type: 'uint256' },
-        { type: 'bytes32' },
-        { type: 'uint256' },
-        { type: 'bytes32' },
-        { type: 'bytes32' },
-      ],
-      [TAG_SHARE, chain_id, ghost_id, attempt_id, checkpoint_commitment, envelope_commitment],
-    ),
-  );
-}
-
-function shareAckDigest(args: {
-  chain_id: bigint;
-  ghost_id: Hex;
-  attempt_id: bigint;
-  checkpoint_commitment: Hex;
-  envelope_commitment: Hex;
-}): Hex {
-  const TAG_SHARE_ACK = keccak256(toBytes('GITS_SHARE_ACK'));
-  const { chain_id, ghost_id, attempt_id, checkpoint_commitment, envelope_commitment } = args;
-  return keccak256(
-    encodeAbiParameters(
-      [
-        { type: 'bytes32' },
-        { type: 'uint256' },
-        { type: 'bytes32' },
-        { type: 'uint256' },
-        { type: 'bytes32' },
-        { type: 'bytes32' },
-      ],
-      [TAG_SHARE_ACK, chain_id, ghost_id, attempt_id, checkpoint_commitment, envelope_commitment],
-    ),
-  );
 }
 
 function decodeIdentityK1Address(identity_pubkey: Hex): Address {
@@ -258,7 +194,7 @@ export class CheckpointPublisher {
     const payload = params.compress ? gzipSync(stateBytes) : stateBytes;
 
     // 3) Encrypt with vault key.
-    const vault = encrypt(payload, params.vaultKey);
+    const vault: EncryptedVault = encrypt(payload, params.vaultKey);
     const vaultBlob = encodeVaultBlob(vault);
 
     // 4) checkpoint_commitment.
