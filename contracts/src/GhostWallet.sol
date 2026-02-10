@@ -19,6 +19,7 @@ import {
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
 /// @dev Minimal clock interface for pulling epoch params from SessionManager.
 interface IEpochClock {
@@ -28,7 +29,7 @@ interface IEpochClock {
 
 /// @title GhostWallet
 /// @notice User-facing entry point for Ghost protocol actions with on-chain policy enforcement (Section 14.3).
-contract GhostWallet is IGhostWallet {
+contract GhostWallet is IGhostWallet, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ─── Config / Dependencies ─────────────────────────────────────────────
@@ -331,7 +332,7 @@ contract GhostWallet is IGhostWallet {
 
     // ─── Recovery ──────────────────────────────────────────────────────────
 
-    function payRescueBounty(bytes32 ghost_id, uint64 attempt_id) external override {
+    function payRescueBounty(bytes32 ghost_id, uint64 attempt_id) external override nonReentrant {
         if (msg.sender != address(SESSION_MANAGER)) revert OnlySessionManager();
         if (_bountyPaid[ghost_id][attempt_id]) revert RescueAlreadyPaid(ghost_id, attempt_id);
 
@@ -475,7 +476,14 @@ contract GhostWallet is IGhostWallet {
         return false;
     }
 
+    /// @dev Policy numeric fields must stay below int256.max so delta arithmetic never overflows.
+    uint256 internal constant _MAX_POLICY_VALUE = uint256(type(int256).max);
+
     function _setPolicy(bytes32 ghost_id, Policy calldata pol) internal {
+        if (pol.hot_allowance > _MAX_POLICY_VALUE) revert InvalidPolicy();
+        if (pol.escape_gas > _MAX_POLICY_VALUE) revert InvalidPolicy();
+        if (pol.escape_stable > _MAX_POLICY_VALUE) revert InvalidPolicy();
+
         Policy storage p = _policy[ghost_id];
 
         p.home_shell = pol.home_shell;
