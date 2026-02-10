@@ -43,6 +43,7 @@ contract VerifierRegistry is IVerifierRegistry {
     error DigestsEqual();
     error SignerMismatch();
     error NoStakeToSlash();
+    error InvalidConstructorParam();
 
     // ─────────────────────────────────────────────────────────────────────────────
     // Constants / Immutables
@@ -120,6 +121,11 @@ contract VerifierRegistry is IVerifierRegistry {
     ) {
         if (epoch_len == 0) revert InvalidEpochLen();
         if (bps_verifier_challenger_reward > 10_000) revert InvalidBps();
+        if (k_v == 0) revert InvalidConstructorParam();
+        if (k_v_threshold == 0) revert InvalidConstructorParam();
+        if (protocol_burn_address == address(0)) revert InvalidConstructorParam();
+        if (asset_verifier_stake == address(0)) revert InvalidConstructorParam();
+        if (shell_registry == address(0)) revert InvalidConstructorParam();
 
         K_V = k_v;
         K_V_THRESHOLD = k_v_threshold;
