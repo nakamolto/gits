@@ -91,7 +91,32 @@ describe('session manager', () => {
 
     const row = db.raw().prepare('SELECT status FROM sessions WHERE session_id = 1').get() as { status: string } | undefined;
     expect(row?.status).toEqual('unserviceable');
+    expect(heartbeat.activeSessionCount()).toEqual(0);
+    db.close();
+  });
+
+  it('registers heartbeat session when shell key was pre-issued', () => {
+    const cfg = testConfig();
+    const db = new ShellDb({ filename: ':memory:' });
+    const metrics = new Metrics();
+    const heartbeat = new HeartbeatService({ chainId: 1n, db, metrics });
+    const store = new IssuedSessionKeyStore();
+    const sm = new ShellSessionManager({ cfg, db, heartbeat, issuedKeys: store });
+
+    const ghost = privateKeyToAccount(('0x' + '11'.repeat(32)) as Hex);
+    const issued = store.issue(60_000);
+
+    sm.onSessionOpened({
+      sessionId: 1n,
+      ghostId: ('0x' + '11'.repeat(32)) as Hex,
+      shellId: cfg.identity.shellId!,
+      ghostSessionKey: encodeSessionKey(ghost.publicKey),
+      shellSessionKey: encodeSessionKey(issued.publicKeyUncompressed),
+    });
+
+    const row = db.raw().prepare('SELECT status FROM sessions WHERE session_id = 1').get() as { status: string } | undefined;
+    expect(row?.status).toEqual('active');
+    expect(heartbeat.activeSessionCount()).toEqual(1);
     db.close();
   });
 });
-

@@ -33,12 +33,13 @@ const SHELL_REGISTRY_ABI = parseAbi([
 const SESSION_MANAGER_ABI = parseAbi([
   'function getSessionKeys(uint256 session_id) external view returns (bytes ghost_key, bytes shell_key, address submitter)',
   'function isActiveRecoveryInitiator(bytes32 shell_id) external view returns (bool)',
+  'function getRecoveryAttempt(bytes32 ghost_id, uint64 attempt_id) external view returns ((uint64 attempt_id, bytes32 ghost_id, bytes32 initiator_shell_id, uint256 start_epoch, bytes32 checkpoint_commitment, bytes32 envelope_commitment, bytes32 rs_hash, uint64 t_required, uint256 bounty_snapshot, uint8 status))',
   'event SessionOpened(bytes32 indexed ghost_id, bytes32 indexed shell_id, uint256 session_id)',
   'event SessionClosed(bytes32 indexed ghost_id, bytes32 indexed shell_id, uint256 session_id)',
 ]);
 
 const RECEIPT_MANAGER_ABI = parseAbi([
-  'function submitReceiptCandidate(uint256 session_id, uint256 epoch, tuple(bytes32 log_root, uint32 su_delivered, bytes log_ptr) candidate) external payable',
+  'function submitReceiptCandidate(uint256 session_id, uint256 epoch, (bytes32 log_root, uint32 su_delivered, bytes log_ptr) candidate) external payable',
   'function publishReceiptLog(uint256 session_id, uint256 epoch, uint256 candidate_id, bytes encoded_log) external',
   'function N() external view returns (uint256)',
   'function B_RECEIPT() external view returns (uint256)',
@@ -255,6 +256,19 @@ export class ChainSubmitter {
       functionName: 'isActiveRecoveryInitiator',
       args: [shellId],
     })) as boolean;
+  }
+
+  async getRecoveryAttempt(ghost_id: Hex, attempt_id: bigint): Promise<{ checkpoint_commitment: Hex; envelope_commitment: Hex }> {
+    const a = (await this.publicClient.readContract({
+      address: this.cfg.chain.deployment.sessionManager,
+      abi: SESSION_MANAGER_ABI,
+      functionName: 'getRecoveryAttempt',
+      args: [ghost_id, attempt_id],
+    })) as any;
+    return {
+      checkpoint_commitment: a.checkpoint_commitment as Hex,
+      envelope_commitment: a.envelope_commitment as Hex,
+    };
   }
 
   async setCertificate(shellId: Hex, certData: Hex, sigsVerifiers: Hex[]): Promise<Hex> {

@@ -30,6 +30,7 @@ export class EscrowManager {
   private readonly spendTracker: SpendTracker;
   private readonly sessions: SessionParamsProvider;
   private readonly fundingState?: SessionFundingStateProvider;
+  private readonly epochProvider?: () => bigint;
 
   constructor(opts: {
     wallet: GhostWalletEscrowClient;
@@ -37,12 +38,14 @@ export class EscrowManager {
     spendTracker: SpendTracker;
     sessions: SessionParamsProvider;
     fundingState?: SessionFundingStateProvider;
+    epochProvider?: () => bigint;
   }) {
     this.wallet = opts.wallet;
     this.policyState = opts.policyState;
     this.spendTracker = opts.spendTracker;
     this.sessions = opts.sessions;
     this.fundingState = opts.fundingState;
+    this.epochProvider = opts.epochProvider;
   }
 
   requiredEscrow(sessionParams: SessionParams): bigint {
@@ -50,6 +53,10 @@ export class EscrowManager {
   }
 
   async fundNextEpoch(ghostId: Hex, sessionId: bigint): Promise<bigint> {
+    const epoch = this.epochProvider?.();
+    const stAny = this.spendTracker as any;
+    if (epoch !== undefined && typeof stAny.loadEpoch === 'function') stAny.loadEpoch(epoch);
+
     const params = await this.sessions.getSessionParams(sessionId);
     const amount = requiredEscrow(params);
 
@@ -72,6 +79,10 @@ export class EscrowManager {
   async autoFundIfNeeded(ghostId: Hex): Promise<boolean> {
     if (!this.fundingState) return false;
 
+    const epoch = this.epochProvider?.();
+    const stAny = this.spendTracker as any;
+    if (epoch !== undefined && typeof stAny.loadEpoch === 'function') stAny.loadEpoch(epoch);
+
     const auto = await this.fundingState.autoRenewLease(ghostId);
     if (!auto) return false;
 
@@ -85,4 +96,3 @@ export class EscrowManager {
     return true;
   }
 }
-

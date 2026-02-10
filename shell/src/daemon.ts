@@ -19,6 +19,7 @@ import { Metrics } from './telemetry/metrics.js';
 import { buildHealthReport } from './telemetry/health.js';
 import { HeartbeatService, NetHeartbeatServer } from './sessions/heartbeat.js';
 import { IssuedSessionKeyStore, ShellSessionManager } from './sessions/session-manager.js';
+import { SafeHaven, SqliteShamirShareStore, createAuthorizeHandler } from './recovery/safe-haven.js';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -64,6 +65,8 @@ export class ShellDaemon {
   private chainListener!: ChainListener;
   private daResponder!: DAResponder;
   private receiptSubmitter!: ReceiptSubmitter;
+  private safeHaven?: SafeHaven;
+  private authorizeHandler?: (body: any) => Promise<any>;
 
   private httpServer?: http.Server;
   private pricingTimer?: NodeJS.Timeout;
@@ -92,6 +95,36 @@ export class ShellDaemon {
 
     // Persist shell_id if provided in config.
     if (this.cfg.identity.shellId) this.db.setMeta('shell_id', this.cfg.identity.shellId);
+
+    if (this.cfg.recovery?.enabled) {
+      const shellId = (this.cfg.identity.shellId ?? (this.db.getMeta('shell_id') as Hex | undefined)) as Hex | undefined;
+      if (!shellId) throw new Error('shell_id not set');
+
+      const recoveryPass = await promptPassphrase('Recovery key passphrase');
+      const recoveryKey = await loadKeyFromFile({
+        purpose: 'recovery',
+        path: this.cfg.recovery.recoveryKeyPath,
+        passphrase: recoveryPass,
+      });
+
+      const recoveryAccount = privateKeyToAccount(recoveryKey.privateKey);
+      const identityAccount = privateKeyToAccount(identityKey.privateKey);
+      const shareStore = new SqliteShamirShareStore(this.db.raw());
+
+      this.safeHaven = new SafeHaven({
+        chain_id: this.cfg.chain.chainId,
+        shell_id: shellId,
+        identity_account: identityAccount as any,
+        recovery_account: recoveryAccount as any,
+        store: shareStore,
+        attempts: this.chain,
+        decryptShare: async (_encrypted: Uint8Array) => {
+          throw new Error('decryptShare: TODO wire ECDH decryption to match encryptShareToRecoveryPubkey');
+        },
+      });
+
+      this.authorizeHandler = createAuthorizeHandler(this.safeHaven);
+    }
 
     this.heartbeat = new HeartbeatService({ chainId: this.cfg.chain.chainId, db: this.db, metrics: this.metrics });
     this.heartbeatUds = new NetHeartbeatServer({ service: this.heartbeat, socketPath: this.cfg.network.heartbeatSocketPath });
@@ -251,6 +284,20 @@ export class ShellDaemon {
             sigGhost: body.sig_ghost ?? body.sigGhost,
           });
           return writeJson(res, 200, out);
+        }
+
+        if (req.method === 'POST' && url.pathname === '/recovery/authorize') {
+          if (!this.authorizeHandler) {
+            return writeJson(res, 404, { error: 'recovery_not_configured' });
+          }
+          const body = await readJson(req);
+          try {
+            const result = await this.authorizeHandler(body);
+            return writeJson(res, 200, result);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : 'unknown_error';
+            return writeJson(res, 400, { error: msg });
+          }
         }
 
         writeJson(res, 404, { error: 'not_found' });

@@ -28,17 +28,20 @@ export class WalletManager {
   private readonly policyState: LocalPolicyState;
   private readonly policyEngine: PolicyEngine;
   private readonly spendTracker: SpendTracker;
+  private readonly epochProvider?: () => bigint;
 
   constructor(opts: {
     wallet: GhostWalletClient;
     policyState: LocalPolicyState;
     policyEngine: PolicyEngine;
     spendTracker: SpendTracker;
+    epochProvider?: () => bigint;
   }) {
     this.wallet = opts.wallet;
     this.policyState = opts.policyState;
     this.policyEngine = opts.policyEngine;
     this.spendTracker = opts.spendTracker;
+    this.epochProvider = opts.epochProvider;
   }
 
   async getBalance(ghostId: Hex): Promise<bigint> {
@@ -50,6 +53,10 @@ export class WalletManager {
   }
 
   async spend(ghostId: Hex, to: Address, amount: bigint): Promise<void> {
+    const epoch = this.epochProvider?.();
+    const stAny = this.spendTracker as any;
+    if (epoch !== undefined && typeof stAny.loadEpoch === 'function') stAny.loadEpoch(epoch);
+
     const policy = await this.getCurrentPolicy(ghostId);
 
     if (!this.spendTracker.canSpend(amount, policy)) {
@@ -78,4 +85,3 @@ export class WalletManager {
     return this.policyEngine.proposeLoosening(ghostId, delta);
   }
 }
-
